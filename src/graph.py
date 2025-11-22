@@ -31,4 +31,5 @@ class Graph:
 g = Graph()
 g.add_edge(1, Edge(g.nodes[2], 2))
 g.add_edge(1, Edge(g.nodes[3], 2))
+print("test")
 print(g.nodes[1])
