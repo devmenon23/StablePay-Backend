@@ -23,6 +23,9 @@ class Node:
 
 
 def get_cost(from_node, to_node):
+    fromcurency = from_node.name
+    tocurrency = to_node
+    
     # placeholder
     return 67, "transact"
 
@@ -87,8 +90,9 @@ class Graph:
 
 g = Graph()
 print(g.nodes[1])
-g.add_edge(1, Edge(g.nodes[2], 2, "moonpay"))
-g.add_edge(1, Edge(g.nodes[3], 2, "moonpay"))
+g.setup_links()
+#g.add_edge(1, Edge(g.nodes[2], 2, "moonpay"))
+#g.add_edge(1, Edge(g.nodes[3], 2, "moonpay"))
 print(g.nodes[1])
 g.update_costs()
 print(g.nodes[1])
