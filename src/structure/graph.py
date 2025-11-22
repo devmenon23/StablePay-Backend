@@ -31,6 +31,7 @@ class Graph:
             Node("SOL"),
             Node("BTC"),
             ]
+            
             self.nametonode = {
             Node("USDC"):0,
             Node("ARS"):1,
