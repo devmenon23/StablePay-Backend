@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI
 
-from app.routers import currency
+from app.routers.currency import router
 
 app = FastAPI(
     title="StableLiving API",
@@ -12,7 +12,7 @@ app = FastAPI(
     redoc_url=None,
 )
 
-app.include_router(currency.router)
+app.include_router(router)
 
 
 @app.get("/")
