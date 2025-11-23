@@ -33,9 +33,7 @@ def get_cost(from_node, to_node, amount):
     # -------------------------------
     if fromcurrency in FIAT or tocurrency in FIAT:
         return 50, "fiat-placeholder"
-    return exchange_crypto.get_cost()
-
-
+    return exchange_crypto.Get_cost()
 
 def get_neighbors(currency):
     # placeholder – replace with API-based neighbors later
