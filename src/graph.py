@@ -54,8 +54,8 @@ def get_neighbors(currency: str):
     Replace with MoonPay/Bitso topology later.
     """
     neighbors = {
-        "USDE": ["MXN", "SOL", "BTC"],
-        "MXN":  ["USDE", "SOL", "BTC"],
+        "USDE": ["SOL", "BTC"],
+        "MXN":  ["BTC"],
         "ARS":  ["BTC", "SOL"],
         "SOL":  ["USDE", "BTC", "MXN", "ARS"],
         "BTC":  ["USDE", "SOL", "ARS", "MXN"],
