@@ -1,4 +1,5 @@
 import requests
+import time
 
 COINGECKO_IDS = {
     "BTC": "bitcoin",
@@ -55,25 +56,31 @@ def Get_cost(src, dest, amount): # amount is in src
     }
 
     response = requests.get(url, params=params, headers=headers)
-
+    if response.status_code != 200:
+        raise ValueError("Failed to fetch cost from swapzone")
     resp = response.json()
     before_usd = convert_to_usd(COINGECKO_IDS[src], resp['amountFrom'])
     after_usd = convert_to_usd(COINGECKO_IDS[dest], resp['amountTo'])
-    return before_usd - after_usd
+    return before_usd - after_usd, "swapzone"
 
-def convert_to_usd(currency_symbol, amount):
+def convert_usd_crypt(currency_symbol, amount):
     """
     Convert `amount` of crypto `currency_symbol` to USD using CoinGecko.
     Example: convert_to_usd("btc", 0.05)
     """
     url = "https://api.coingecko.com/api/v3/simple/price"
+    #print(currency_symbol.lower())
     params = {
         "ids": currency_symbol.lower(),
-        "vs_currencies": "usd"
+        "vs_currencies": "usd",
     }
-    
-    response = requests.get(url, params=params)
+    headers = {
+        "x-cg-demo-api-key": "CG-Sv6NRNkmpPbkU27jeWGaNrbR",
+    }
 
+    response = requests.get(url, params=params, headers=headers)
+
+    #print(response)
     if response.status_code != 200:
         raise ValueError("Failed to fetch price data from CoinGecko")
 
@@ -85,4 +92,4 @@ def convert_to_usd(currency_symbol, amount):
     price_usd = data[currency_symbol.lower()]["usd"]
     return amount * price_usd
 
-print(get_cost("SOL", "WBTC", 20))
+#print(Get_cost("SOL", "WBTC", 20))

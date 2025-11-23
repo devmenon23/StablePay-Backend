@@ -138,4 +138,4 @@ def Get_cost(from_currency, to_currency, amount):
     """
     Wrapper around get_trade_fee_for_pair to match graph.py's get_cost signature.
     """
-    return amount * get_trade_fee_for_pair(from_currency, to_currency), "bitso"
+    amount * get_trade_fee_for_pair(from_currency, to_currency), "bitso"
