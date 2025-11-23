@@ -1,1 +1,36 @@
+<<<<<<< HEAD
 .env
+=======
+__pycache__/
+*.py[cod]
+*$py.class
+
+build/
+dist/
+*.egg-info/
+*.egg
+pip-wheel-metadata/
+
+.venv/
+venv/
+env/
+ENV/
+
+.pytest_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+__pycache__/
+
+.env
+.env.*
+!.env.example
+
+.vscode/
+.idea/
+*.swp
+*.swo
+
+.DS_Store
+>>>>>>> e190b6c996b8b414e914a12ceeb529a8c2148174

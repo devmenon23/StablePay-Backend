@@ -60,7 +60,7 @@ class Graph:
             "BTC": 4,
         }
         self.setup_links()
-
+    
     def add_edge(self, from_index, edge):
         self.nodes[from_index].edges.append(edge)
 
