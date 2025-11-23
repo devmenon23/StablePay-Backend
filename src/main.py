@@ -49,7 +49,7 @@ async def root():
     return {"message": "StableLiving API - Currency conversion and optimization"}
 
 
-@app.get("/convert_currency", response_model=ConvertCurrencyResponse)
+@app.post("/convert_currency", response_model=ConvertCurrencyResponse)
 async def convert_currency_endpoint(request: ConvertCurrencyRequest):
     """
     Convert currency using exchange rates.
@@ -65,7 +65,7 @@ async def convert_currency_endpoint(request: ConvertCurrencyRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.get("/get_cost", response_model=GetCostResponse)
+@app.post("/get_cost", response_model=GetCostResponse)
 async def get_cost_endpoint(request: GetCostRequest):
     """
     Get the cost (fee) for converting from one currency to another.
@@ -93,7 +93,7 @@ async def get_cost_endpoint(request: GetCostRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.get("/dijkstra", response_model=DijkstraResponse)
+@app.post("/dijkstra", response_model=DijkstraResponse)
 async def dijkstra_endpoint(request: DijkstraRequest):
     """
     Run Dijkstra's algorithm to find shortest path costs from a starting currency.

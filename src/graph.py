@@ -1,5 +1,5 @@
 # graph.py
-
+import convert
 import exchange_crypto
 import exchange_fiat
 import math
@@ -37,26 +37,16 @@ def get_fee_percent(from_currency: str, to_currency: str) -> tuple[float, str]:
     For crypto ↔ crypto edges, Swapzone gives us the fee fraction directly.
     Returns (p, exchange_name) where p is in [0, 1) if valid.
     """
-    amount = 1.0  # arbitrary notional; percent shouldn't depend on it
-
+    amount = convert.convert_currency("USD", from_currency, 1000)  # arbitrary notional; percent shouldn't depend on it
     # Case 1: at least one side is fiat → use Bitso
     if from_currency in FIAT or to_currency in FIAT:
-        cost, exchange = exchange_fiat.Get_cost(from_currency, to_currency, amount)
-
-        # No direct market or invalid pair
-        if cost == float("inf"):
-            return float("inf"), exchange
-
-        # Bitso cost ~ amount * (percent/100), so cost/amount = fee_fraction
-        p = cost / amount
-        return p, exchange
+        fee_percent, exchange = exchange_fiat.Get_cost(from_currency, to_currency, amount)
+        return fee_percent, exchange
 
     # Case 2: crypto ↔ crypto → use Swapzone
-    abs_fee_usd, fee_fraction, exchange = exchange_crypto.Get_cost(
-        from_currency, to_currency, amount
-    )
+    fee_percent, exchange = exchange_crypto.Get_cost(from_currency, to_currency, amount)
 
-    return fee_fraction, exchange
+    return fee_percent, exchange
 
 
 def get_neighbors(currency: str):
@@ -65,10 +55,10 @@ def get_neighbors(currency: str):
     Replace with MoonPay/Bitso topology later.
     """
     neighbors = {
-        "USDE": ["MXN", "ARS", "SOL", "BTC"],
+        "USDE": ["MXN", "SOL", "BTC"],
         "MXN":  ["USDE", "SOL", "BTC"],
-        "ARS":  ["USDE", "BTC"],
-        "SOL":  ["USDE", "BTC", "MXN"],
+        "ARS":  ["BTC", "SOL"],
+        "SOL":  ["USDE", "BTC", "MXN", "ARS"],
         "BTC":  ["USDE", "SOL", "ARS", "MXN"],
     }
     return neighbors.get(currency, [])
@@ -119,7 +109,7 @@ class Graph:
 
                 edge.fee_percent = p
                 edge.exchange = exchange
-
+                print(p, node.name, edge.to_node.name)
                 # In log-space: multiplicative losses become additive weights.
                 # If each edge keeps (1 - p_i) of value, total retention along path is
                 #   Π(1 - p_i)

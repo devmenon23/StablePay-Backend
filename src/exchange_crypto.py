@@ -10,7 +10,6 @@ def Get_cost(src, dest, amount): # amount is in src
         "from": src.lower(),
         "to": dest.lower(),
         "amount": amount,
-        "fromNetwork": "ETH",
         "rateType": "all",
         "availableInUSA": "false",
         "chooseRate": "best",
@@ -23,17 +22,16 @@ def Get_cost(src, dest, amount): # amount is in src
     }
 
     response = requests.get(url, params=params, headers=headers)
+    #print(response.json(), dest, amount)
     if response.status_code != 200:
         raise ValueError("Failed to fetch cost from swapzone")
     if response.status_code != 200:
         raise ValueError("Failed to fetch cost from swapzone")
     resp = response.json()
-    print(resp, url, params)
-    before_usd = convert.convert_currency(src, "USD", resp['amountFrom'])
-    print(before_usd)
+    before_usd = convert.convert_currency(src, "USD", resp['amountFrom']) # just use USD to calculate losst fee
     after_usd = convert.convert_currency(dest, "USD", resp['amountTo'])
-    print(after_usd)
-    return before_usd - after_usd, (before_usd - after_usd) / before_usd, "swapzone"
 
-print(Get_cost("TETHER", "LTC", 1))
+    return (before_usd - after_usd) / before_usd, "swapzone"
+
+#print(Get_cost("USDE", "BTC", 1))
 #print(Get_cost("LTC", "XMR", 6))

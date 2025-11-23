@@ -2,6 +2,7 @@ import requests
 
 COINGECKO_IDS = {
     "BTC": "bitcoin",
+    "USDE": "ethena-usde",
     "ETH": "ethereum",
     "USDT": "tether",
     "USDC": "usd-coin",

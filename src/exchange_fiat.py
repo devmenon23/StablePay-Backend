@@ -4,163 +4,94 @@ import time
 import hmac
 import hashlib
 import requests
-from dotenv import load_dotenv
+import convert
 
-load_dotenv()
-
-BITSO_BASE_URL = os.getenv("BITSO_BASE_URL", "https://stage.bitso.com")
-
-API_KEY = os.getenv("BITSO_API_KEY")
-API_SECRET = os.getenv("BITSO_API_SECRET")
-
-# Bitso symbols -> our node names
-SYMBOL_TO_NODE = {
-    "ars": "ARS",
-    "usd": "USDC",  # Bitso "usd" ticker = digital dollars (USDC)
-    "btc": "BTC",
-    "sol": "SOL",
-    "mxn": "MXN",   # Mexican pesos (real fiat)
-}
-
-NODE_TO_SYMBOL = {v: k for k, v in SYMBOL_TO_NODE.items()}
-
-BOOK_FEES = {}          # book -> {"maker": float, "taker": float}
-CURRENCY_NEIGHBORS = {} # "USDC" -> ["ARS", "BTC", "SOL", "MXN", ...]
-
-
-def _bitso_request(method: str, path: str, auth: bool = False, params=None):
+def p2p_quote(from_currency: str, to_currency: str, amount: float):
     """
-    Minimal Bitso request wrapper.
-    For GET + no body, the signed message is: nonce + method + path + ""
-    Query params are NOT included in the signature.
-    """
-    url = BITSO_BASE_URL + path
-    headers = {"Content-Type": "application/json"}
-
-    if auth:
-        if not API_KEY or not API_SECRET:
-            raise RuntimeError(
-                "BITSO_API_KEY and BITSO_API_SECRET must be set in environment."
-            )
-
-        nonce = str(int(time.time() * 1000))
-        message = nonce + method.upper() + path
-        signature = hmac.new(
-            API_SECRET.encode("utf-8"),
-            message.encode("utf-8"),
-            hashlib.sha256,
-        ).hexdigest()
-        headers["Authorization"] = f"Bitso {API_KEY}:{nonce}:{signature}"
-
-    resp = requests.request(method, url, params=params, headers=headers, timeout=10)
-    resp.raise_for_status()
-    data = resp.json()
-    if not data.get("success", True):
-        raise RuntimeError(f"Bitso API error: {data}")
-    return data["payload"]
-
-
-def init_bitso_data():
-    """
-    Populate BOOK_FEES and CURRENCY_NEIGHBORS from Bitso.
-    Call this once at startup.
+    Very simple P2P estimator based on mid‑market prices.
+    Plug in your P2P marketplace (Binance P2P, OKX P2P, etc.)
     """
 
-    global BOOK_FEES, CURRENCY_NEIGHBORS
-
-    fees_payload = _bitso_request("GET", "/api/v3/fees/", auth=True)
-    fees_list = fees_payload["fees"]
-
-    BOOK_FEES = {
-        fee["book"]: {
-            "maker": float(fee["maker_fee_percent"]),
-            "taker": float(fee["taker_fee_percent"]),
-        }
-        for fee in fees_list
+    P2P_RATES = {
+        ("BTC", "ARS"): 90000000,      # ARS per BTC (example)
+        ("USDT", "ARS"): 1500,         # ARS per USDT
+        ("ARS", "USDT"): 1 / 1500,
+        ("ARS", "BTC"): 1 / 90000000,
     }
 
-    books_payload = _bitso_request("GET", "/api/v3/available_books/", auth=False)
+    key = (from_currency, to_currency)
+    if key not in P2P_RATES:
+        return None, None
 
-    neighbors = {name: set() for name in SYMBOL_TO_NODE.values()}
-
-    for book in books_payload:
-        book_name = book["book"]  # e.g. "btc_ars", "usd_ars", "sol_usd", "usd_mxn"
-        try:
-            base, quote = book_name.split("_")
-        except ValueError:
-            continue
-
-        if base not in SYMBOL_TO_NODE or quote not in SYMBOL_TO_NODE:
-            # ignore books we don't care about
-            continue
-
-        c1 = SYMBOL_TO_NODE[base]
-        c2 = SYMBOL_TO_NODE[quote]
-
-        neighbors[c1].add(c2)
-        neighbors[c2].add(c1)
-
-    CURRENCY_NEIGHBORS = {k: sorted(list(v)) for k, v in neighbors.items()}
+    rate = P2P_RATES[key]
+    final_amount = amount * rate
+    return final_amount, "p2p"
 
 
-def get_neighbors_for(currency_name: str):
+def Get_cost(from_currency: str, to_currency: str, amount: float):
+
+    # ---------- 2. Try P2P aggregator ----------
+    try:
+        final_amount, ex = p2p_quote(from_currency, to_currency, amount)
+        if final_amount is not None:
+            fee_percent = 1 - (final_amount / amount)
+            return fee_percent, ex
+    except:
+        pass
+
+import requests
+
+def binance_p2p_avg_price(asset="USDT", fiat="ARS", trade_type="BUY", limit=10):
     """
-    Return list of neighbor currencies for a given node name,
-    based on Bitso books.
-    """
-    return CURRENCY_NEIGHBORS.get(currency_name, [])
+    Fetch average P2P price for USDT/ARS using Binance public endpoints.
 
-
-def get_trade_fee_for_pair(from_currency: str, to_currency: str):
-    """
-    Given two node names (e.g. "ARS", "USDC"), return taker_fee_percent as a float.
-
-    Example: if Bitso says "0.6500" (0.65%), we store 0.65 and return 0.65.
-
-    If there is no direct Bitso book, returns float('inf').
+    trade_type = "BUY"  → users buying crypto (you SELL crypto)
+    trade_type = "SELL" → users selling crypto (you BUY crypto)
     """
 
-    from_sym = NODE_TO_SYMBOL.get(from_currency)
-    to_sym = NODE_TO_SYMBOL.get(to_currency)
+    url = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search"
 
-    if not from_sym or not to_sym:
-        return float("inf")
+    payload = {
+        "page": 1,
+        "rows": limit,
+        "asset": asset,
+        "fiat": fiat,
+        "tradeType": trade_type,  
+        "publisherType": None
+    }
 
-    # Books are unordered conceptually; Bitso uses base_quote.
-    book1 = f"{from_sym}_{to_sym}"
-    book2 = f"{to_sym}_{from_sym}"
+    headers = {
+        "Content-Type": "application/json"
+    }
 
-    if book1 in BOOK_FEES:
-        book = book1
-    elif book2 in BOOK_FEES:
-        book = book2
+    r = requests.post(url, json=payload, headers=headers)
+    data = r.json()
+
+    if "data" not in data:
+        raise Exception("Unexpected Binance response")
+
+    prices = []
+    for offer in data["data"]:
+        price = float(offer["adv"]["price"])
+        prices.append(price)
+    
+    if len(prices) == 0:
+        return 0
+    return sum(prices) / len(prices)
+
+FIAT = ["ARS"]
+
+def Get_cost(src, dest, amount):
+    to_amount = 0.0
+    if src in FIAT:
+        to_amount = binance_p2p_avg_price(dest, src, trade_type="SELL")
     else:
-        return float("inf")
-
-    fee_percent = BOOK_FEES[book]["taker"]  # use taker fee as "transaction fee" percent
-    return fee_percent
-
-
-def Get_cost(from_currency, to_currency, amount):
-    """
-    Return the absolute fee for trading `amount` of from_currency into to_currency,
-    using Bitso's taker fee percentage.
-
-    Example:
-      BOOK_FEES["usd_ars"]["taker"] == 0.65  # 0.65%
-      amount = 1000 ARS
-      cost = 1000 * (0.65 / 100) = 6.5 ARS
-    """
-
-    # No fee if you're "converting" the same currency in this model
-    if from_currency == to_currency:
-        return 0.0, "bitso"
-
-    fee_percent = get_trade_fee_for_pair(from_currency, to_currency)
-
-    if fee_percent == float("inf"):
-        return float("inf"), "bitso"
-
-    fee_fraction = fee_percent / 100.0  # convert percent to fraction
-    cost = amount * fee_fraction
-    return cost, "bitso"
+        to_amount = binance_p2p_avg_price(src, dest, trade_type="BUY")
+    before_usd = convert.convert_currency(src, "USD", 1)
+    print(before_usd)
+    after_usd = convert.convert_currency(dest, "USD", to_amount)
+    print(after_usd)
+    fees = (before_usd - after_usd) / before_usd
+    if fees < 0:
+        fees = 0
+    return fees, "p2p"
