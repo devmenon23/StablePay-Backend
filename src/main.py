@@ -1,10 +1,8 @@
-# main.py
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Dict, Optional, List
 
-# Import the functions
-from conversion_optimizer import dijkstra, evaluate_path
+from conversion_optimizer import dijkstra, evaluate_path as evaluate_path_core
 from convert import convert_currency
 from exchange_crypto import Get_cost as Get_cost_crypto
 from exchange_fiat import Get_cost as Get_cost_fiat
@@ -37,9 +35,9 @@ class DijkstraRequest(BaseModel):
 
 
 class EvaluatePathRequest(BaseModel):
-    # Sequence of currency symbols representing the path, e.g. ["ARS", "USDE", "SOL", "MXN"]
-    path: List[str]
-    amount: float  # initial amount in path[0] currency
+    from_currency: str   # start_currency
+    to_currency: str     # target_currency
+    amount: float        # initial amount in from_currency
 
 
 # =========================
@@ -60,7 +58,7 @@ class DijkstraResponse(BaseModel):
     previous: Dict[str, Optional[str]]    # previous node name or None
 
 
-class HopBreakdown(BaseModel):
+class Hop(BaseModel):
     from_ccy: str
     to_ccy: str
     fee_percent: float
@@ -73,11 +71,12 @@ class HopBreakdown(BaseModel):
 
 
 class EvaluatePathResponse(BaseModel):
-    final_amount: float                 # in last currency of the path
-    final_amount_ars: Optional[float]   # same amount converted to ARS (if possible)
-    total_fee_local: float              # sum of fees in each hop's local currency
-    total_fee_ars: float                # sum of fees expressed in ARS
-    hops: List[HopBreakdown]
+    path: Optional[List[str]]          # e.g. ["ARS", "USDE", "SOL", "MXN"]
+    final_amount: Optional[float]      # in to_currency
+    final_amount_ars: Optional[float]  # same amount converted to ARS (if possible)
+    total_fee_local: Optional[float]
+    total_fee_ars: Optional[float]
+    hops: List[Hop]
 
 
 # =========================
@@ -181,61 +180,54 @@ async def dijkstra_endpoint(request: DijkstraRequest):
 @app.post("/evaluate_path", response_model=EvaluatePathResponse)
 async def evaluate_path_endpoint(request: EvaluatePathRequest):
     """
-    Evaluate a specific path of currencies with chained fees.
+    Find the optimal path from from_currency to to_currency using Dijkstra,
+    then evaluate that path with chained fees and FX conversions.
 
-    - `path`: list of currency symbols, e.g. ["ARS", "USDE", "SOL", "MXN"]
-    - `amount`: initial amount in the first currency in `path`
-
-    Uses the same Graph + edge fees/log-costs as the /dijkstra endpoint.
+    Uses conversion_optimizer.evaluate_path under the hood.
     """
     try:
-        if not request.path:
-            raise HTTPException(status_code=400, detail="Path cannot be empty")
+        result = evaluate_path_core(
+            request.from_currency,
+            request.to_currency,
+            request.amount,
+        )
 
-        # Build graph and costs
-        g = graph.Graph()
-        g.update_costs()
+        # result is the dict returned by conversion_optimizer.evaluate_path
+        # {
+        #   "path": [...],
+        #   "final_amount": ...,
+        #   "final_amount_ars": ...,
+        #   "total_fee_local": ...,
+        #   "total_fee_ars": ...,
+        #   "hops": [ { "from": ..., "to": ..., ... }, ... ]
+        # }
 
-        # Map currency codes in the path to Node objects
-        path_nodes = []
-        for ccy in request.path:
-            if ccy not in g.nametoindex:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Currency '{ccy}' not found in graph",
-                )
-            idx = g.nametoindex[ccy]
-            path_nodes.append(g.nodes[idx])
-
-        # Call the core evaluate_path logic
-        eval_result = evaluate_path(path_nodes, request.amount)
-
-        # Transform hop dicts into HopBreakdown models
-        hops_models: List[HopBreakdown] = []
-        for hop in eval_result["hops"]:
-            hops_models.append(
-                HopBreakdown(
-                    from_ccy=hop["from"],
-                    to_ccy=hop["to"],
-                    fee_percent=hop["fee_percent"],
-                    fee_local=hop["fee_local"],
-                    fee_ars=hop["fee_ars"],
-                    amount_before=hop["amount_before"],
-                    amount_after_fee=hop["amount_after_fee"],
-                    amount_next=hop["amount_next"],
-                    exchange=hop["exchange"],
-                )
+        hop_models: List[Hop] = [
+            Hop(
+                from_ccy=hop["from"],
+                to_ccy=hop["to"],
+                fee_percent=hop["fee_percent"],
+                fee_local=hop["fee_local"],
+                fee_ars=hop["fee_ars"],
+                amount_before=hop["amount_before"],
+                amount_after_fee=hop["amount_after_fee"],
+                amount_next=hop["amount_next"],
+                exchange=hop["exchange"],
             )
+            for hop in result["hops"]
+        ]
 
         return EvaluatePathResponse(
-            final_amount=eval_result["final_amount"],
-            final_amount_ars=eval_result["final_amount_ars"],
-            total_fee_local=eval_result["total_fee_local"],
-            total_fee_ars=eval_result["total_fee_ars"],
-            hops=hops_models,
+            path=result["path"],
+            final_amount=result["final_amount"],
+            final_amount_ars=result["final_amount_ars"],
+            total_fee_local=result["total_fee_local"],
+            total_fee_ars=result["total_fee_ars"],
+            hops=hop_models,
         )
-    except HTTPException:
-        raise
+    except ValueError as e:
+        # e.g. start/target currency not in graph
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
