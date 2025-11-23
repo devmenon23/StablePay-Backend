@@ -94,6 +94,6 @@ class Graph:
 g = Graph()
 #print(g.nodes[1])
 g.setup_links()
-g.update_costs(66)
+g.update_costs()
 #g.add_edge(1, Edge(g.nodes[2], 2, "moonpay"))
 #g.add_edge(1, Edge(g.nodes[3], 2, "moonpay"))
