@@ -74,9 +74,7 @@ def binance_p2p_avg_price(asset="USDT", fiat="ARS", trade_type="BUY", limit=10):
     for offer in data["data"]:
         price = float(offer["adv"]["price"])
         prices.append(price)
-    print("len", len(prices))
     if len(prices) == 0:
-        print(asset, fiat, trade_type)
         raise ValueError("no buy/sells", asset, fiat)
     return sum(prices) / len(prices)
 
@@ -89,9 +87,7 @@ def Get_cost(src, dest, amount):
     else:
         to_amount = binance_p2p_avg_price(src, dest, trade_type="BUY")
     before_usd = convert.convert_currency(src, "USD", 1)
-    print(before_usd)
     after_usd = convert.convert_currency(dest, "USD", to_amount)
-    print(after_usd, to_amount)
     fees = (before_usd - after_usd) / before_usd
     if fees < 0:
         fees = 0

@@ -55,7 +55,7 @@ def get_neighbors(currency: str):
     """
     neighbors = {
         "USDE": ["SOL", "BTC"],
-        "MXN":  ["BTC"],
+        "MXN":  ["BTC", "SOL"],
         "ARS":  ["BTC", "SOL"],
         "SOL":  ["USDE", "BTC", "MXN", "ARS"],
         "BTC":  ["USDE", "SOL", "ARS", "MXN"],
@@ -108,7 +108,6 @@ class Graph:
 
                 edge.fee_percent = p
                 edge.exchange = exchange
-                print(p, node.name, edge.to_node.name)
                 # In log-space: multiplicative losses become additive weights.
                 # If each edge keeps (1 - p_i) of value, total retention along path is
                 #   Π(1 - p_i)
