@@ -27,11 +27,12 @@ def Get_cost(src, dest, amount): # amount is in src
     if response.status_code != 200:
         raise ValueError("Failed to fetch cost from swapzone")
     resp = response.json()
+    print(resp, url, params)
     before_usd = convert.convert_currency(src, "USD", resp['amountFrom'])
     print(before_usd)
     after_usd = convert.convert_currency(dest, "USD", resp['amountTo'])
     print(after_usd)
-    return before_usd - after_usd, "swapzone"
+    return before_usd - after_usd, (before_usd - after_usd) / before_usd, "swapzone"
 
-print(Get_cost("BTC", "XMR", convert.convert_currency("USD", "BTC", 50)))
-print(Get_cost("LTC", "XMR", convert.convert_currency("USD", "LTC", 50)))
+#print(Get_cost("LTC", "XMR", 6))
+#print(Get_cost("USDCDOT", "XMR", 620))
