@@ -1,36 +1,62 @@
-<<<<<<< HEAD
+# Environment variables
 .env
-=======
-__pycache__/
+.env.*
+!.env.example
+
+# Byte-compiled / optimized / DLL files
 *.py[cod]
+*.pyc
+*.pyo
+*.pyd
 *$py.class
 
+# Python cache directories (must be explicit at all levels)
+__pycache__/
+**/__pycache__/
+
+# C extensions
+*.so
+
+# Build and distribution
 build/
 dist/
 *.egg-info/
 *.egg
 pip-wheel-metadata/
+.Python
 
+# Virtual environments
 .venv/
 venv/
 env/
 ENV/
+env.bak/
+venv.bak/
 
+# Testing and type checking
 .pytest_cache/
 .mypy_cache/
+.dmypy.json
+dmypy.json
 .coverage
 .coverage.*
 coverage.xml
-__pycache__/
+htmlcov/
+.tox/
+.nox/
 
-.env
-.env.*
-!.env.example
-
+# IDE
 .vscode/
 .idea/
+*.sublime-project
+*.sublime-workspace
+
+# Editor backups
 *.swp
 *.swo
+*~
 
+# OS
 .DS_Store
->>>>>>> e190b6c996b8b414e914a12ceeb529a8c2148174
+.DS_Store?
+._*

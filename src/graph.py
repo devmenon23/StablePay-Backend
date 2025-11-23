@@ -1,18 +1,22 @@
 # graph.py
 
+import math
+
 import exchange_crypto
 import exchange_fiat
-import math
+
 
 class Edge:
     def __init__(self, to_node, cost, exchange):
-        self.to_node = to_node   # Node instance
-        self.cost = cost         # numeric fee
-        self.exchange = exchange # e.g. "moonpay", "bitso", etc.
-    
+        self.to_node = to_node  # Node instance
+        self.cost = cost  # numeric fee
+        self.exchange = exchange  # e.g. "moonpay", "bitso", etc.
+
     def __str__(self):
         return "edge: exchange [%s] to [%s] cost [%s]" % (
-            self.exchange, self.to_node.name, self.cost
+            self.exchange,
+            self.to_node.name,
+            self.cost,
         )
 
 
@@ -23,12 +27,14 @@ class Node:
 
     def __str__(self):
         return "node: name %s edges: [%s]" % (
-            self.name, ", ".join([str(edge) for edge in self.edges])
+            self.name,
+            ", ".join([str(edge) for edge in self.edges]),
         )
 
 
 # Treat these as fiat for routing / fee API selection
 FIAT = {"USD", "ARS", "MXN"}
+
 
 def get_fee_percent(from_currency: str, to_currency: str) -> tuple[float, str]:
     """
@@ -66,10 +72,10 @@ def get_neighbors(currency: str):
     """
     neighbors = {
         "USDC": ["MXN", "ARS", "SOL", "BTC"],
-        "MXN":  ["USDC", "SOL", "BTC"],
-        "ARS":  ["USDC", "BTC"],
-        "SOL":  ["USDC", "BTC", "MXN"],
-        "BTC":  ["USDC", "SOL", "ARS", "MXN"],
+        "MXN": ["USDC", "SOL", "BTC"],
+        "ARS": ["USDC", "BTC"],
+        "SOL": ["USDC", "BTC", "MXN"],
+        "BTC": ["USDC", "SOL", "ARS", "MXN"],
     }
     return neighbors.get(currency, [])
 
@@ -143,7 +149,4 @@ class Graph:
                 to_node = self.nodes[to_index]
 
                 # Initial cost 0, exchange "", will be updated later
-                self.add_edge(
-                    from_index,
-                    Edge(to_node, 0, "")
-                )
+                self.add_edge(from_index, Edge(to_node, 0, ""))
