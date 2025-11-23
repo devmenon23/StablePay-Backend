@@ -100,7 +100,7 @@ class Graph:
                 p, exchange = get_fee_percent(node.name, edge.to_node.name)
 
                 # Invalid or too expensive edge
-                if (not math.isfinite(p)) or p <= 0.0 or p >= 1.0:
+                if (not math.isfinite(p)) or p < 0.0 or p >= 1.0:
                     edge.cost = float("inf")
                     edge.fee_percent = p
                     edge.exchange = exchange
