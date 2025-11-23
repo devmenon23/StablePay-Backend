@@ -1,5 +1,8 @@
-import exchange_crypto
 # graph.py
+
+import exchange_crypto
+import exchange_fiat
+
 class Edge:
     def __init__(self, to_node, cost, exchange):
         self.to_node = to_node
@@ -24,25 +27,22 @@ class Node:
 
 FIAT = {"USD", "ARS"}
 
-def get_cost(from_node, to_node, amount):
-    fromcurrency = from_node.name
-    tocurrency = to_node.name
-
-    # -------------------------------
-    # 1. If either side is a fiat → placeholder
-    # -------------------------------
+def get_cost(fromcurrency, tocurrency, amount):
     if fromcurrency in FIAT or tocurrency in FIAT:
-        return 50, "fiat-placeholder"
-    return exchange_crypto.Get_cost()
+        print("using fiat with", fromcurrency, tocurrency)
+        return 6, "test"
+        return exchange_fiat(fromcurrency, tocurrency, amount)
+    print("using crypto with", fromcurrency, tocurrency)
+    return exchange_crypto.Get_cost(fromcurrency, tocurrency, amount)
 
 def get_neighbors(currency):
     # placeholder – replace with API-based neighbors later
     neighbors = {
         "USDC": ["USD", "ARS", "SOL", "BTC"],
-        "USD":  ["USDC", "ARS"],
-        "ARS":  ["USDC", "USD"],
-        "SOL":  ["USDC"],
-        "BTC":  ["USDC"],
+        "USD":  ["USDC", "SOL", "BTC"],
+        "ARS":  ["USDC", "BTC"],
+        "SOL":  ["USDC", "BTC", "USD"],
+        "BTC":  ["USDC", "SOL", "ARS", "USD"],
     }
     return neighbors.get(currency, [])
 
@@ -72,7 +72,7 @@ class Graph:
     def update_costs(self, amount):
         for node in self.nodes:
             for edge in node.edges:
-                edge.cost, edge.exchange = exchange_crypto.Get_cost(node.name, edge.to_node.name, amount)
+                edge.cost, edge.exchange = get_cost(node.name, edge.to_node.name, amount)
 
     def setup_links(self):
         for node in self.nodes:
@@ -95,7 +95,7 @@ class Graph:
                 )
 
 g = Graph()
-print(g.nodes[1])
+#print(g.nodes[1])
 g.setup_links()
 g.update_costs(66)
 #g.add_edge(1, Edge(g.nodes[2], 2, "moonpay"))
