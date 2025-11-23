@@ -26,7 +26,6 @@ class Node:
             self.name, ", ".join([str(edge) for edge in self.edges])
         )
 
-
 # Treat these as fiat for routing / fee API selection
 FIAT = {"USD", "ARS", "MXN"}
 
