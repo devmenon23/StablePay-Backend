@@ -1,31 +1,22 @@
-# exchange_fiat.py
-import os
-import time
-import hmac
 import hashlib
+import hmac
+import time
+
 import requests
-from dotenv import load_dotenv
 
-load_dotenv()
+from app.core.config import BITSO_API_KEY, BITSO_API_SECRET, BITSO_BASE_URL
 
-BITSO_BASE_URL = os.getenv("BITSO_BASE_URL", "https://stage.bitso.com")
-
-API_KEY = os.getenv("BITSO_API_KEY")
-API_SECRET = os.getenv("BITSO_API_SECRET")
-
-# Bitso symbols -> our node names
 SYMBOL_TO_NODE = {
     "ars": "ARS",
-    "usd": "USDC",  # Bitso "usd" ticker = digital dollars (USDC)
+    "usd": "USDC",
     "btc": "BTC",
     "sol": "SOL",
-    "mxn": "MXN",   # Mexican pesos (real fiat)
+    "mxn": "MXN",
 }
 
 NODE_TO_SYMBOL = {v: k for k, v in SYMBOL_TO_NODE.items()}
 
-BOOK_FEES = {}          # book -> {"maker": float, "taker": float}
-CURRENCY_NEIGHBORS = {} # "USDC" -> ["ARS", "BTC", "SOL", "MXN", ...]
+BOOK_FEES = {}
 
 
 def _bitso_request(method: str, path: str, auth: bool = False, params=None):
@@ -38,35 +29,38 @@ def _bitso_request(method: str, path: str, auth: bool = False, params=None):
     headers = {"Content-Type": "application/json"}
 
     if auth:
-        if not API_KEY or not API_SECRET:
-            raise RuntimeError(
-                "BITSO_API_KEY and BITSO_API_SECRET must be set in environment."
-            )
+        if not BITSO_API_KEY or not BITSO_API_SECRET:
+            raise RuntimeError("BITSO_API_KEY and BITSO_API_SECRET must be set in environment.")
 
         nonce = str(int(time.time() * 1000))
         message = nonce + method.upper() + path
+
         signature = hmac.new(
-            API_SECRET.encode("utf-8"),
+            BITSO_API_SECRET.encode("utf-8"),
             message.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
-        headers["Authorization"] = f"Bitso {API_KEY}:{nonce}:{signature}"
+
+        headers["Authorization"] = f"Bitso {BITSO_API_KEY}:{nonce}:{signature}"
 
     resp = requests.request(method, url, params=params, headers=headers, timeout=10)
     resp.raise_for_status()
+
     data = resp.json()
+
     if not data.get("success", True):
         raise RuntimeError(f"Bitso API error: {data}")
+
     return data["payload"]
 
 
 def init_bitso_data():
     """
-    Populate BOOK_FEES and CURRENCY_NEIGHBORS from Bitso.
+    Populate BOOK_FEES from Bitso.
     Call this once at startup.
     """
 
-    global BOOK_FEES, CURRENCY_NEIGHBORS
+    global BOOK_FEES
 
     fees_payload = _bitso_request("GET", "/api/v3/fees/", auth=True)
     fees_list = fees_payload["fees"]
@@ -78,37 +72,6 @@ def init_bitso_data():
         }
         for fee in fees_list
     }
-
-    books_payload = _bitso_request("GET", "/api/v3/available_books/", auth=False)
-
-    neighbors = {name: set() for name in SYMBOL_TO_NODE.values()}
-
-    for book in books_payload:
-        book_name = book["book"]  # e.g. "btc_ars", "usd_ars", "sol_usd", "usd_mxn"
-        try:
-            base, quote = book_name.split("_")
-        except ValueError:
-            continue
-
-        if base not in SYMBOL_TO_NODE or quote not in SYMBOL_TO_NODE:
-            # ignore books we don't care about
-            continue
-
-        c1 = SYMBOL_TO_NODE[base]
-        c2 = SYMBOL_TO_NODE[quote]
-
-        neighbors[c1].add(c2)
-        neighbors[c2].add(c1)
-
-    CURRENCY_NEIGHBORS = {k: sorted(list(v)) for k, v in neighbors.items()}
-
-
-def get_neighbors_for(currency_name: str):
-    """
-    Return list of neighbor currencies for a given node name,
-    based on Bitso books.
-    """
-    return CURRENCY_NEIGHBORS.get(currency_name, [])
 
 
 def get_trade_fee_for_pair(from_currency: str, to_currency: str):
@@ -126,7 +89,6 @@ def get_trade_fee_for_pair(from_currency: str, to_currency: str):
     if not from_sym or not to_sym:
         return float("inf")
 
-    # Books are unordered conceptually; Bitso uses base_quote.
     book1 = f"{from_sym}_{to_sym}"
     book2 = f"{to_sym}_{from_sym}"
 
@@ -137,7 +99,7 @@ def get_trade_fee_for_pair(from_currency: str, to_currency: str):
     else:
         return float("inf")
 
-    fee_percent = BOOK_FEES[book]["taker"]  # use taker fee as "transaction fee" percent
+    fee_percent = BOOK_FEES[book]["taker"]
     return fee_percent
 
 
@@ -147,12 +109,11 @@ def Get_cost(from_currency, to_currency, amount):
     using Bitso's taker fee percentage.
 
     Example:
-      BOOK_FEES["usd_ars"]["taker"] == 0.65  # 0.65%
+      BOOK_FEES["usd_ars"]["taker"] == 0.65
       amount = 1000 ARS
       cost = 1000 * (0.65 / 100) = 6.5 ARS
     """
 
-    # No fee if you're "converting" the same currency in this model
     if from_currency == to_currency:
         return 0.0, "bitso"
 
@@ -161,6 +122,7 @@ def Get_cost(from_currency, to_currency, amount):
     if fee_percent == float("inf"):
         return float("inf"), "bitso"
 
-    fee_fraction = fee_percent / 100.0  # convert percent to fraction
+    fee_fraction = fee_percent / 100.0
     cost = amount * fee_fraction
+
     return cost, "bitso"

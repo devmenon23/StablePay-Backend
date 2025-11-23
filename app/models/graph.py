@@ -1,16 +1,13 @@
-# graph.py
-
 import math
 
-import exchange_crypto
-import exchange_fiat
+from app.core.config import FIAT_CURRENCIES
 
 
 class Edge:
     def __init__(self, to_node, cost, exchange):
-        self.to_node = to_node  # Node instance
-        self.cost = cost  # numeric fee
-        self.exchange = exchange  # e.g. "moonpay", "bitso", etc.
+        self.to_node = to_node
+        self.cost = cost
+        self.exchange = exchange
 
     def __str__(self):
         return "edge: exchange [%s] to [%s] cost [%s]" % (
@@ -23,17 +20,13 @@ class Edge:
 class Node:
     def __init__(self, name: str):
         self.name = name
-        self.edges = []  # list[Edge]
+        self.edges = []
 
     def __str__(self):
         return "node: name %s edges: [%s]" % (
             self.name,
             ", ".join([str(edge) for edge in self.edges]),
         )
-
-
-# Treat these as fiat for routing / fee API selection
-FIAT = {"USD", "ARS", "MXN"}
 
 
 def get_fee_percent(from_currency: str, to_currency: str) -> tuple[float, str]:
@@ -43,10 +36,13 @@ def get_fee_percent(from_currency: str, to_currency: str) -> tuple[float, str]:
     For crypto ↔ crypto edges, Swapzone gives us the fee fraction directly.
     Returns (p, exchange_name) where p is in [0, 1) if valid.
     """
-    amount = 1.0  # arbitrary notional; percent shouldn't depend on it
+    # Import here to avoid circular imports
+    from app.services import exchange_crypto, exchange_fiat
+
+    amount = 1.0
 
     # Case 1: at least one side is fiat → use Bitso
-    if from_currency in FIAT or to_currency in FIAT:
+    if from_currency in FIAT_CURRENCIES or to_currency in FIAT_CURRENCIES:
         cost, exchange = exchange_fiat.Get_cost(from_currency, to_currency, amount)
 
         # No direct market or invalid pair
@@ -82,7 +78,6 @@ def get_neighbors(currency: str):
 
 class Graph:
     def __init__(self):
-        # Define nodes
         self.nodes = [
             Node("USDC"),
             Node("ARS"),
@@ -91,7 +86,6 @@ class Graph:
             Node("BTC"),
         ]
 
-        # Map from currency name to index in self.nodes
         self.nametoindex = {
             "USDC": 0,
             "ARS": 1,
@@ -100,7 +94,6 @@ class Graph:
             "BTC": 4,
         }
 
-        # Build adjacency structure (edges with zero cost initially)
         self.setup_links()
 
     def add_edge(self, from_index: int, edge: Edge):
@@ -148,5 +141,4 @@ class Graph:
                 to_index = self.nametoindex[currency]
                 to_node = self.nodes[to_index]
 
-                # Initial cost 0, exchange "", will be updated later
                 self.add_edge(from_index, Edge(to_node, 0, ""))

@@ -1,14 +1,15 @@
-# conversion_optimizer.py
 import heapq
-import graph
 
-def dijkstra(graph, start):
-    costs = {node: float('inf') for node in graph.nodes}
+from app.models.graph import Graph
+
+
+def dijkstra(graph: Graph, start):
+    costs = {node: float("inf") for node in graph.nodes}
     prev = {node: None for node in costs}
-    
+
     costs[start] = 0
     pq = [(0, start.name, start)]
-    
+
     while pq:
         currCost, name, u = heapq.heappop(pq)
 
@@ -18,7 +19,9 @@ def dijkstra(graph, start):
         for edge in u.edges:
             v = edge.to_node
             c = edge.cost
+
             newCost = currCost + c
+
             if newCost < costs[v]:
                 costs[v] = newCost
                 prev[v] = u
@@ -26,17 +29,22 @@ def dijkstra(graph, start):
 
     return costs, prev
 
+
 def reconstruct_path(prev, start, target):
     if prev.get(target) is None and start != target:
         return None
-    
+
     path = []
     curr = target
+
     while curr is not None:
         path.append(curr)
         curr = prev[curr]
+
     path.reverse()
+
     return path
+
 
 def evaluate_path(path_nodes, initial_amount: float):
     """
@@ -51,21 +59,22 @@ def evaluate_path(path_nodes, initial_amount: float):
         u = path_nodes[i]
         v = path_nodes[i + 1]
 
-        # find edge u -> v
         edge = next(e for e in u.edges if e.to_node is v)
 
         fee = amount * edge.fee_percent
         amount_after = amount - fee
 
-        hops.append({
-            "from": u.name,
-            "to": v.name,
-            "fee": fee,
-            "fee_percent": edge.fee_percent,
-            "amount_before": amount,
-            "amount_after": amount_after,
-            "exchange": edge.exchange,
-        })
+        hops.append(
+            {
+                "from": u.name,
+                "to": v.name,
+                "fee": fee,
+                "fee_percent": edge.fee_percent,
+                "amount_before": amount,
+                "amount_after": amount_after,
+                "exchange": edge.exchange,
+            }
+        )
 
         total_fee += fee
         amount = amount_after

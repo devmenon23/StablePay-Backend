@@ -1,0 +1,37 @@
+[tool.poetry]
+name = "stableliving"
+version = "1.0.0"
+description = "Currency conversion and optimization API"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.104.0"
+uvicorn = {extras = ["standard"], version = "^0.24.0"}
+pydantic = "^2.0.0"
+requests = "^2.31.0"
+python-dotenv = "^1.0.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.0.0"
+isort = "^5.12.0"
+
+[tool.poetry.scripts]
+serve = "uvicorn.app.main:app"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ['py312']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip_gitignore = true
+
