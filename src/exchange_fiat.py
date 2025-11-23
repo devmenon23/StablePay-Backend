@@ -4,22 +4,29 @@ import time
 import hmac
 import hashlib
 import requests
+from dotenv import load_dotenv
 
-BITSO_BASE_URL = "https://api.bitso.com"
+load_dotenv()
+
+BITSO_BASE_URL = os.getenv("BITSO_BASE_URL", "https://stage.bitso.com")
 
 API_KEY = os.getenv("BITSO_API_KEY")
 API_SECRET = os.getenv("BITSO_API_SECRET")
 
+# Bitso symbols -> our node names
 SYMBOL_TO_NODE = {
     "ars": "ARS",
-    "usd": "USDC",
+    "usd": "USDC",  # Bitso "usd" ticker = digital dollars (USDC)
     "btc": "BTC",
+    "sol": "SOL",
+    "mxn": "MXN",   # Mexican pesos (real fiat)
 }
 
 NODE_TO_SYMBOL = {v: k for k, v in SYMBOL_TO_NODE.items()}
 
 BOOK_FEES = {}          # book -> {"maker": float, "taker": float}
-CURRENCY_NEIGHBORS = {} # "USDC" -> ["ARS", "SOL", ...]
+CURRENCY_NEIGHBORS = {} # "USDC" -> ["ARS", "BTC", "SOL", "MXN", ...]
+
 
 def _bitso_request(method: str, path: str, auth: bool = False, params=None):
     """
@@ -27,7 +34,6 @@ def _bitso_request(method: str, path: str, auth: bool = False, params=None):
     For GET + no body, the signed message is: nonce + method + path + ""
     Query params are NOT included in the signature.
     """
-
     url = BITSO_BASE_URL + path
     headers = {"Content-Type": "application/json"}
 
@@ -53,6 +59,7 @@ def _bitso_request(method: str, path: str, auth: bool = False, params=None):
         raise RuntimeError(f"Bitso API error: {data}")
     return data["payload"]
 
+
 def init_bitso_data():
     """
     Populate BOOK_FEES and CURRENCY_NEIGHBORS from Bitso.
@@ -75,14 +82,14 @@ def init_bitso_data():
     books_payload = _bitso_request("GET", "/api/v3/available_books/", auth=False)
 
     neighbors = {name: set() for name in SYMBOL_TO_NODE.values()}
-    
+
     for book in books_payload:
-        book_name = book["book"]  # e.g. "btc_ars", "usd_ars", "sol_usd"
+        book_name = book["book"]  # e.g. "btc_ars", "usd_ars", "sol_usd", "usd_mxn"
         try:
             base, quote = book_name.split("_")
         except ValueError:
             continue
-        
+
         if base not in SYMBOL_TO_NODE or quote not in SYMBOL_TO_NODE:
             # ignore books we don't care about
             continue
@@ -95,6 +102,7 @@ def init_bitso_data():
 
     CURRENCY_NEIGHBORS = {k: sorted(list(v)) for k, v in neighbors.items()}
 
+
 def get_neighbors_for(currency_name: str):
     """
     Return list of neighbor currencies for a given node name,
@@ -102,40 +110,57 @@ def get_neighbors_for(currency_name: str):
     """
     return CURRENCY_NEIGHBORS.get(currency_name, [])
 
+
 def get_trade_fee_for_pair(from_currency: str, to_currency: str):
     """
-    Given two node names (e.g. "ARS", "USDC"), return:
-        (cost, exchange_name)
+    Given two node names (e.g. "ARS", "USDC"), return taker_fee_percent as a float.
 
-    cost = taker_fee_percent (e.g. 0.65 for 0.65%)
-    exchange_name = human-readable label, e.g. "bitso:usd_ars"
+    Example: if Bitso says "0.6500" (0.65%), we store 0.65 and return 0.65.
 
-    If there is no direct Bitso book, returns (float('inf'), 'unavailable').
+    If there is no direct Bitso book, returns float('inf').
     """
 
     from_sym = NODE_TO_SYMBOL.get(from_currency)
     to_sym = NODE_TO_SYMBOL.get(to_currency)
 
     if not from_sym or not to_sym:
-        return float("inf"), "unavailable"
+        return float("inf")
 
     # Books are unordered conceptually; Bitso uses base_quote.
     book1 = f"{from_sym}_{to_sym}"
     book2 = f"{to_sym}_{from_sym}"
 
-    book = None
     if book1 in BOOK_FEES:
         book = book1
     elif book2 in BOOK_FEES:
         book = book2
     else:
-        return float("inf"), "no-direct-book"
+        return float("inf")
 
-    fee_percent = BOOK_FEES[book]["taker"]  # use taker fee as "transaction fee"
+    fee_percent = BOOK_FEES[book]["taker"]  # use taker fee as "transaction fee" percent
     return fee_percent
+
 
 def Get_cost(from_currency, to_currency, amount):
     """
-    Wrapper around get_trade_fee_for_pair to match graph.py's get_cost signature.
+    Return the absolute fee for trading `amount` of from_currency into to_currency,
+    using Bitso's taker fee percentage.
+
+    Example:
+      BOOK_FEES["usd_ars"]["taker"] == 0.65  # 0.65%
+      amount = 1000 ARS
+      cost = 1000 * (0.65 / 100) = 6.5 ARS
     """
-    amount * get_trade_fee_for_pair(from_currency, to_currency), "bitso"
+
+    # No fee if you're "converting" the same currency in this model
+    if from_currency == to_currency:
+        return 0.0, "bitso"
+
+    fee_percent = get_trade_fee_for_pair(from_currency, to_currency)
+
+    if fee_percent == float("inf"):
+        return float("inf"), "bitso"
+
+    fee_fraction = fee_percent / 100.0  # convert percent to fraction
+    cost = amount * fee_fraction
+    return cost, "bitso"
