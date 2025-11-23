@@ -10,6 +10,7 @@ def Get_cost(src, dest, amount): # amount is in src
         "from": src.lower(),
         "to": dest.lower(),
         "amount": amount,
+        "fromNetwork": "ETH",
         "rateType": "all",
         "availableInUSA": "false",
         "chooseRate": "best",
@@ -34,5 +35,5 @@ def Get_cost(src, dest, amount): # amount is in src
     print(after_usd)
     return before_usd - after_usd, (before_usd - after_usd) / before_usd, "swapzone"
 
+print(Get_cost("TETHER", "LTC", 1))
 #print(Get_cost("LTC", "XMR", 6))
-#print(Get_cost("USDCDOT", "XMR", 620))

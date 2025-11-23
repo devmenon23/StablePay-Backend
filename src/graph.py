@@ -65,11 +65,11 @@ def get_neighbors(currency: str):
     Replace with MoonPay/Bitso topology later.
     """
     neighbors = {
-        "USDC": ["MXN", "ARS", "SOL", "BTC"],
-        "MXN":  ["USDC", "SOL", "BTC"],
-        "ARS":  ["USDC", "BTC"],
-        "SOL":  ["USDC", "BTC", "MXN"],
-        "BTC":  ["USDC", "SOL", "ARS", "MXN"],
+        "USDE": ["MXN", "ARS", "SOL", "BTC"],
+        "MXN":  ["USDE", "SOL", "BTC"],
+        "ARS":  ["USDE", "BTC"],
+        "SOL":  ["USDE", "BTC", "MXN"],
+        "BTC":  ["USDE", "SOL", "ARS", "MXN"],
     }
     return neighbors.get(currency, [])
 
@@ -78,7 +78,7 @@ class Graph:
     def __init__(self):
         # Define nodes
         self.nodes = [
-            Node("USDC"),
+            Node("USDE"),
             Node("ARS"),
             Node("MXN"),
             Node("SOL"),
@@ -87,7 +87,7 @@ class Graph:
 
         # Map from currency name to index in self.nodes
         self.nametoindex = {
-            "USDC": 0,
+            "USDE": 0,
             "ARS": 1,
             "MXN": 2,
             "SOL": 3,
