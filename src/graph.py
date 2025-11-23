@@ -1,5 +1,8 @@
-import exchange_crypto
 # graph.py
+
+import exchange_crypto
+import exchange_fiat
+
 class Edge:
     def __init__(self, to_node, cost, exchange):
         self.to_node = to_node

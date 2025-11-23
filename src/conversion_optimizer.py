@@ -37,17 +37,3 @@ def reconstruct_path(prev, start, target):
         curr = prev[curr]
     path.reverse()
     return path
-
-g = graph.Graph()
-# ARS -> USD (2), ARS -> BTC (10), USD -> BTC (3)
-g.add_edge(1, graph.Edge(g.nodes[2], 2, "moonpay"))   # ARS -> USD
-g.add_edge(1, graph.Edge(g.nodes[4], 10, "moonpay"))  # ARS -> BTC
-g.add_edge(2, graph.Edge(g.nodes[4], 3, "moonpay"))   # USD -> BTC
-start = g.nodes[1]   # ARS
-target = g.nodes[4]  # BTC
-
-costs, prev = dijkstra(g, start)
-path = reconstruct_path(prev, start, target)
-
-print("Cost:", costs[target])
-print("Path:", " -> ".join(node.name for node in path))
