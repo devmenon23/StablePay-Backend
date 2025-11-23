@@ -39,9 +39,9 @@ def reconstruct_path(prev, start, target):
 
 g = graph.Graph()
 # ARS -> USD (2), ARS -> BTC (10), USD -> BTC (3)
-g.add_edge(1, graph.Edge(g.nodes[2], 2))   # ARS -> USD
-g.add_edge(1, graph.Edge(g.nodes[4], 10))  # ARS -> BTC
-g.add_edge(2, graph.Edge(g.nodes[4], 3))   # USD -> BTC
+g.add_edge(1, graph.Edge(g.nodes[2], 2, "moonpay"))   # ARS -> USD
+g.add_edge(1, graph.Edge(g.nodes[4], 10, "moonpay"))  # ARS -> BTC
+g.add_edge(2, graph.Edge(g.nodes[4], 3, "moonpay"))   # USD -> BTC
 start = g.nodes[1]   # ARS
 target = g.nodes[4]  # BTC
 

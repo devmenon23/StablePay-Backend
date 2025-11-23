@@ -1,3 +1,4 @@
+import exchange_crypto
 # graph.py
 class Edge:
     def __init__(self, to_node, cost, exchange):
@@ -21,13 +22,19 @@ class Node:
             self.name, ', '.join([str(edge) for edge in self.edges])
         )
 
+FIAT = {"USD", "ARS"}
 
 def get_cost(from_node, to_node, amount):
-    fromcurency = from_node.name
-    tocurrency = to_node
-    
-    # placeholder
-    return 67, "transact"
+    fromcurrency = from_node.name
+    tocurrency = to_node.name
+
+    # -------------------------------
+    # 1. If either side is a fiat → placeholder
+    # -------------------------------
+    if fromcurrency in FIAT or tocurrency in FIAT:
+        return 50, "fiat-placeholder"
+    return exchange_crypto.get_cost()
+
 
 
 def get_neighbors(currency):
@@ -67,7 +74,7 @@ class Graph:
     def update_costs(self, amount):
         for node in self.nodes:
             for edge in node.edges:
-                edge.cost, edge.exchange = get_cost(node, edge.to_node, amount)
+                edge.cost, edge.exchange = exchange_crypto.Get_cost(node.name, edge.to_node.name, amount)
 
     def setup_links(self):
         for node in self.nodes:
