@@ -40,16 +40,11 @@ def reconstruct_path(prev, start, target):
     path.reverse()
     return path
 
-def evaluate_path(path_nodes, initial_amount: float):
+def _evaluate_path_nodes(path_nodes, initial_amount: float):
     """
-    Simulate chained fees along [n0, n1, ..., nk].
-
-    - initial_amount is in currency path_nodes[0].name
-    - Each hop applies fee_percent to the *current* amount
-    - We track:
-        * fee in local hop currency
-        * fee converted to ARS
-        * updated amount in next node's currency
+    Internal helper: given a list of Node objects [n0, n1, ..., nk]
+    and an initial_amount in n0.name, simulate chained fees and
+    convert fees to ARS along the way.
     """
     if not path_nodes or len(path_nodes) == 1:
         # trivial path or no path
@@ -125,3 +120,67 @@ def evaluate_path(path_nodes, initial_amount: float):
         "total_fee_ars": total_fee_ars,
         "hops": hops,
     }
+
+
+def evaluate_path(start_currency: str, target_currency: str, initial_amount: float):
+    """
+    High-level API:
+
+    1. Build the graph
+    2. Populate edge fees + log-space costs (update_costs)
+    3. Run Dijkstra from start_currency
+    4. Reconstruct the optimal path to target_currency
+    5. Simulate chained fees and FX via _evaluate_path_nodes
+
+    Returns the same structure as _evaluate_path_nodes plus the path:
+        {
+          "final_amount": ...,
+          "final_amount_ars": ...,
+          "total_fee_local": ...,
+          "total_fee_ars": ...,
+          "hops": [...],
+          "path": ["ARS", "USDE", "SOL", "MXN"]
+        }
+    """
+    # Build graph
+    g = graph.Graph()
+    g.update_costs()
+
+    # Find start and target nodes
+    start_node = None
+    target_node = None
+
+    for node in g.nodes:
+        if node.name == start_currency:
+            start_node = node
+        if node.name == target_currency:
+            target_node = node
+
+    if start_node is None:
+        raise ValueError(f"Start currency '{start_currency}' not found in graph")
+    if target_node is None:
+        raise ValueError(f"Target currency '{target_currency}' not found in graph")
+
+    # Run Dijkstra
+    costs, prev = dijkstra(g, start_node)
+
+    # Reconstruct path
+    path_nodes = reconstruct_path(prev, start_node, target_node)
+    if path_nodes is None:
+        # No path exists between these currencies in this graph
+        return {
+            "path": None,
+            "final_amount": None,
+            "final_amount_ars": None,
+            "total_fee_local": None,
+            "total_fee_ars": None,
+            "hops": [],
+        }
+
+    # Evaluate path as before
+    base_result = _evaluate_path_nodes(path_nodes, initial_amount)
+
+    # Add the path as currency codes for convenience
+    base_result["path"] = [node.name for node in path_nodes]
+
+    return base_result
