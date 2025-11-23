@@ -126,11 +126,3 @@ def convert_currency(from_ccy, to_ccy, amount):
     # crypto → crypto: convert through USD automatically
     usd_value = cryptotofiat(from_ccy, "USD", amount)
     return fiattocrypto("USD", to_ccy, usd_value)
-
-
-# -------------------------
-# TESTS
-# -------------------------
-print("Convert BTC → ETH:", convert_currency("BTC", "ETH", 0.1))
-print("Convert EUR → BTC:", convert_currency("EUR", "BTC", 100))
-print("Convert EUR → BTC:", convert_currency("MXN", "BTC", 100))

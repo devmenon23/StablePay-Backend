@@ -103,8 +103,8 @@ async def dijkstra_endpoint(request: DijkstraRequest):
         # Create a graph instance
         g = graph.Graph()
         
-        # Update costs based on the amount
-        g.update_costs(request.amount)
+        # Update edge fees and log-space costs
+        g.update_costs()  # <-- removed request.amount
         
         # Find the start node by currency name
         start_node = None

@@ -33,19 +33,30 @@ FIAT = {"USD", "ARS", "MXN"}
 def get_fee_percent(from_currency: str, to_currency: str) -> tuple[float, str]:
     """
     Compute fee percentage p for the edge (from_currency -> to_currency).
-    Uses your existing Get_cost_* API with amount = 1.0.
-    Returns (p, exchange_name).
+    For FIAT edges, Bitso returns an absolute fee which we turn into a fraction.
+    For crypto ↔ crypto edges, Swapzone gives us the fee fraction directly.
+    Returns (p, exchange_name) where p is in [0, 1) if valid.
     """
-    amount = 1.0
+    amount = 1.0  # arbitrary notional; percent shouldn't depend on it
 
+    # Case 1: at least one side is fiat → use Bitso
     if from_currency in FIAT or to_currency in FIAT:
         cost, exchange = exchange_fiat.Get_cost(from_currency, to_currency, amount)
-    else:
-        cost, exchange = exchange_crypto.Get_cost(from_currency, to_currency, amount)
 
-    # cost = amount * p = 1.0 * p
-    p = cost / amount
-    return p, exchange
+        # No direct market or invalid pair
+        if cost == float("inf"):
+            return float("inf"), exchange
+
+        # Bitso cost ~ amount * (percent/100), so cost/amount = fee_fraction
+        p = cost / amount
+        return p, exchange
+
+    # Case 2: crypto ↔ crypto → use Swapzone
+    abs_fee_usd, fee_fraction, exchange = exchange_crypto.Get_cost(
+        from_currency, to_currency, amount
+    )
+
+    return fee_fraction, exchange
 
 
 def get_neighbors(currency: str):
@@ -92,18 +103,15 @@ class Graph:
     def update_costs(self):
         """
         For each edge, fill in:
-          - fee_percent (p)
-          - cost = -log(1 - p)  # Dijkstra weight
+          - fee_percent (p)  as a fraction of value lost [0, 1)
+          - cost = -log(1 - p)  # Dijkstra weight in log-space
         """
         for node in self.nodes:
             for edge in node.edges:
                 p, exchange = get_fee_percent(node.name, edge.to_node.name)
 
-                # Guard: if p >= 1.0, the fee is 100%+ (invalid)
-                if p >= 1.0:
-                    # You can either:
-                    #  - drop the edge, or
-                    #  - set cost = +inf so Dijkstra never picks it
+                # Invalid or too expensive edge
+                if (not math.isfinite(p)) or p <= 0.0 or p >= 1.0:
                     edge.cost = float("inf")
                     edge.fee_percent = p
                     edge.exchange = exchange
@@ -111,6 +119,11 @@ class Graph:
 
                 edge.fee_percent = p
                 edge.exchange = exchange
+
+                # In log-space: multiplicative losses become additive weights.
+                # If each edge keeps (1 - p_i) of value, total retention along path is
+                #   Π(1 - p_i)
+                # and we minimize sum(-log(1 - p_i)) instead.
                 edge.cost = -math.log(1.0 - p)
 
     def setup_links(self):
