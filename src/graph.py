@@ -2,12 +2,13 @@
 
 import exchange_crypto
 import exchange_fiat
+import math
 
 class Edge:
     def __init__(self, to_node, cost, exchange):
-        self.to_node = to_node
-        self.cost = cost
-        self.exchange = exchange
+        self.to_node = to_node   # Node instance
+        self.cost = cost         # numeric fee
+        self.exchange = exchange # e.g. "moonpay", "bitso", etc.
     
     def __str__(self):
         return "edge: exchange [%s] to [%s] cost [%s]" % (
@@ -16,69 +17,109 @@ class Edge:
 
 
 class Node:
-    def __init__(self, name):
+    def __init__(self, name: str):
         self.name = name
-        self.edges = []
+        self.edges = []  # list[Edge]
 
     def __str__(self):
         return "node: name %s edges: [%s]" % (
-            self.name, ', '.join([str(edge) for edge in self.edges])
+            self.name, ", ".join([str(edge) for edge in self.edges])
         )
 
-FIAT = {"USD", "ARS"}
 
-def get_cost(fromcurrency, tocurrency, amount):
-    if fromcurrency in FIAT or tocurrency in FIAT:
-        print("using fiat with", fromcurrency, tocurrency)
-        return 6, "test"
-        return exchange_fiat(fromcurrency, tocurrency, amount)
-    print("using crypto with", fromcurrency, tocurrency)
-    return exchange_crypto.Get_cost(fromcurrency, tocurrency, amount)
+# Treat these as fiat for routing / fee API selection
+FIAT = {"USD", "ARS", "MXN"}
 
-def get_neighbors(currency):
-    # placeholder – replace with API-based neighbors later
+def get_fee_percent(from_currency: str, to_currency: str) -> tuple[float, str]:
+    """
+    Compute fee percentage p for the edge (from_currency -> to_currency).
+    Uses your existing Get_cost_* API with amount = 1.0.
+    Returns (p, exchange_name).
+    """
+    amount = 1.0
+
+    if from_currency in FIAT or to_currency in FIAT:
+        cost, exchange = exchange_fiat.Get_cost(from_currency, to_currency, amount)
+    else:
+        cost, exchange = exchange_crypto.Get_cost(from_currency, to_currency, amount)
+
+    # cost = amount * p = 1.0 * p
+    p = cost / amount
+    return p, exchange
+
+
+def get_neighbors(currency: str):
+    """
+    Hard-coded neighbor map for now.
+    Replace with MoonPay/Bitso topology later.
+    """
     neighbors = {
-        "USDC": ["USD", "ARS", "SOL", "BTC"],
-        "USD":  ["USDC", "SOL", "BTC"],
+        "USDC": ["MXN", "ARS", "SOL", "BTC"],
+        "MXN":  ["USDC", "SOL", "BTC"],
         "ARS":  ["USDC", "BTC"],
-        "SOL":  ["USDC", "BTC", "USD"],
-        "BTC":  ["USDC", "SOL", "ARS", "USD"],
+        "SOL":  ["USDC", "BTC", "MXN"],
+        "BTC":  ["USDC", "SOL", "ARS", "MXN"],
     }
     return neighbors.get(currency, [])
 
 
 class Graph:
     def __init__(self):
+        # Define nodes
         self.nodes = [
             Node("USDC"),
             Node("ARS"),
-            Node("USD"),
+            Node("MXN"),
             Node("SOL"),
             Node("BTC"),
         ]
 
+        # Map from currency name to index in self.nodes
         self.nametoindex = {
             "USDC": 0,
             "ARS": 1,
-            "USD": 2,
+            "MXN": 2,
             "SOL": 3,
             "BTC": 4,
         }
+
+        # Build adjacency structure (edges with zero cost initially)
         self.setup_links()
 
-    def add_edge(self, from_index, edge):
+    def add_edge(self, from_index: int, edge: Edge):
         self.nodes[from_index].edges.append(edge)
 
-    def update_costs(self, amount):
+    def update_costs(self):
+        """
+        For each edge, fill in:
+          - fee_percent (p)
+          - cost = -log(1 - p)  # Dijkstra weight
+        """
         for node in self.nodes:
             for edge in node.edges:
-                edge.cost, edge.exchange = get_cost(node.name, edge.to_node.name, amount)
+                p, exchange = get_fee_percent(node.name, edge.to_node.name)
+
+                # Guard: if p >= 1.0, the fee is 100%+ (invalid)
+                if p >= 1.0:
+                    # You can either:
+                    #  - drop the edge, or
+                    #  - set cost = +inf so Dijkstra never picks it
+                    edge.cost = float("inf")
+                    edge.fee_percent = p
+                    edge.exchange = exchange
+                    continue
+
+                edge.fee_percent = p
+                edge.exchange = exchange
+                edge.cost = -math.log(1.0 - p)
 
     def setup_links(self):
+        """
+        Build edges between nodes based on get_neighbors().
+        Costs and exchange names will be filled in later by update_costs().
+        """
         for node in self.nodes:
             currencies = get_neighbors(node.name)
-
-            # current node index
             from_index = self.nametoindex[node.name]
 
             for currency in currencies:
@@ -88,15 +129,8 @@ class Graph:
                 to_index = self.nametoindex[currency]
                 to_node = self.nodes[to_index]
 
-                # cost initially 0, exchange empty
+                # Initial cost 0, exchange "", will be updated later
                 self.add_edge(
                     from_index,
                     Edge(to_node, 0, "")
                 )
-
-g = Graph()
-#print(g.nodes[1])
-g.setup_links()
-g.update_costs()
-#g.add_edge(1, Edge(g.nodes[2], 2, "moonpay"))
-#g.add_edge(1, Edge(g.nodes[3], 2, "moonpay"))
