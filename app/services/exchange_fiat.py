@@ -84,9 +84,9 @@ def _bitso_request(method, path, auth, params=None, timeout_s=10.0):
     return data["payload"]
 
 
-def init_bitso_data():
+def update_book_fees():
     """
-    Populate BOOK_FEES from Bitso fees endpoint.
+    Update BOOK_FEES from Bitso fees endpoint.
 
     Call this once at startup (or whenever you want to refresh fees).
     """ 
@@ -96,11 +96,7 @@ def init_bitso_data():
     fees_list = payload.get("fees")
 
     BOOK_FEES = {
-        item["book"]: {
-            "maker": float(item["maker_fee_decimal"]),
-            "taker": float(item["taker_fee_decimal"]),
-        }
-        for item in fees_list
+        item["book"]: float(item["fee_decimal"]) for item in fees_list
     }
 
 def get_trade_fee_for_pair(from_currency: str, to_currency: str):
@@ -111,6 +107,7 @@ def get_trade_fee_for_pair(from_currency: str, to_currency: str):
 
     If there is no direct Bitso book, returns float('inf').
     """
+    update_book_fees()
 
     from_sym = NODE_TO_SYMBOL.get(from_currency)
     to_sym = NODE_TO_SYMBOL.get(to_currency)
@@ -128,7 +125,7 @@ def get_trade_fee_for_pair(from_currency: str, to_currency: str):
     else:
         return float("inf")
 
-    return BOOK_FEES[book]["taker"]
+    return BOOK_FEES[book]
 
 
 def get_cost(from_currency, to_currency, amount):

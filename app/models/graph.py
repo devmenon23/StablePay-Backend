@@ -37,26 +37,19 @@ def get_fee_percent(from_currency: str, to_currency: str) -> tuple[float, str]:
     # Import here to avoid circular imports
     from app.services import exchange_crypto, exchange_fiat
 
-    amount = 1.0
     # Case 1: at least one side is fiat then use Bitso
     if from_currency in FIAT_CURRENCIES or to_currency in FIAT_CURRENCIES:
-        cost, exchange = exchange_fiat.get_cost(from_currency, to_currency, amount)
+        fee_percent, exchange = exchange_fiat.get_trade_fee_for_pair(from_currency, to_currency)
 
         # No direct market or invalid pair
-        if cost == float("inf"):
+        if fee_percent == float("inf"):
             return float("inf"), exchange
-
-        # Bitso cost ~ amount * (percent/100), so cost/amount = fee_fraction
-        fee_percent = cost / amount
-
     else:
-        cost, exchange = exchange_crypto.get_cost(from_currency, to_currency, amount)
+        fee_percent, exchange = exchange_crypto.get_trade_fee_for_pair(from_currency, to_currency)
 
         # No direct market or invalid pair
-        if cost == float("inf"):
+        if fee_percent == float("inf"):
             return float("inf"), exchange
-
-        fee_percent = cost / amount
         
     return fee_percent, exchange
 
@@ -97,7 +90,7 @@ class Graph:
     def add_edge(self, from_index: int, edge: Edge):
         self.nodes[from_index].edges.append(edge)
 
-    def update_costs(self):
+    def update_fees(self):
         """
         For each edge, fill in:
           - fee_percent (p)  as a fraction of value lost [0, 1)

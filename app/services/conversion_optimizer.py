@@ -44,7 +44,6 @@ def reconstruct_path(prev, start, target):
 
     return path
 
-
 def evaluate_path(path_nodes, initial_amount: float):
     """
     Given a list of nodes [n0, n1, ..., nk] and initial_amount,

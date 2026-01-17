@@ -1,17 +1,18 @@
 from fastapi import APIRouter, HTTPException
+import math
 
 from app.core.config import FIAT_CURRENCIES
 from app.models.graph import Graph
 from app.schemas.currency import (
     ConvertCurrencyRequest,
     ConvertCurrencyResponse,
-    DijkstraRequest,
-    DijkstraResponse,
     GetCostRequest,
     GetCostResponse,
+    FindOptimizedPathRequest,
+    FindOptimizedPathResponse,
 )
 from app.services import convert, exchange_crypto, exchange_fiat
-from app.services.conversion_optimizer import dijkstra
+from app.services.conversion_optimizer import dijkstra, reconstruct_path, evaluate_path
 
 router = APIRouter(tags=["currency"])
 
@@ -50,11 +51,11 @@ async def get_cost_endpoint(request: GetCostRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/dijkstra", response_model=DijkstraResponse)
-async def dijkstra_endpoint(request: DijkstraRequest):
+@router.post("/find_optimized_path", response_model=FindOptimizedPathResponse)
+async def find_optimized_path_endpoint(request: FindOptimizedPathRequest):
     """
-    Run Dijkstra's algorithm to find shortest path costs from a starting currency.
-    Returns costs to all reachable currencies and previous node information.
+    Find the lowest-fee conversion route from start_currency -> target_currency.
+    Returns the hop-by-hop fees and final amount.
     """
     try:
         g = Graph()
@@ -65,23 +66,50 @@ async def dijkstra_endpoint(request: DijkstraRequest):
             if node.name == request.start_currency:
                 start_node = node
                 break
+        
+        target_node = None
+        for node in g.nodes:
+            if node.name == request.target_currency:
+                target_node = node
+                break
 
         if start_node is None:
-            raise HTTPException(
-                status_code=404, detail=f"Currency '{request.start_currency}' not found in graph"
-            )
+            raise HTTPException(status_code=404, detail=f"Start currency '{request.start_currency}' not in graph")
+        if target_node is None:
+            raise HTTPException(status_code=404, detail=f"Target currency '{request.target_currency}' not in graph")
 
         costs, prev = dijkstra(g, start_node)
 
-        costs_dict = {
-            node.name: costs[node] if costs[node] != float("inf") else None for node in costs
-        }
+        if (costs[target_node] == float("inf") or prev.get(target_node) is None) and start_node != target_node:
+            raise HTTPException(status_code=404, detail="No route found")
+        
+        path_nodes = reconstruct_path(prev, start_node, target_node)
+        if not path_nodes:
+            raise HTTPException(status_code=404, detail="No route found")
 
-        previous_dict = {
-            node.name: prev[node].name if prev[node] is not None else None for node in prev
-        }
+        eval_result = evaluate_path(path_nodes, request.amount)
 
-        return DijkstraResponse(costs=costs_dict, previous=previous_dict)
+        # adapt hop keys to schema
+        hops = [
+            {
+                "from_currency": h["from"],
+                "to_currency": h["to"],
+                "fee": h["fee"],
+                "fee_percent": h["fee_percent"],
+                "amount_before": h["amount_before"],
+                "amount_after": h["amount_after"],
+                "exchange": h["exchange"],
+            }
+            for h in eval_result["hops"]
+        ]
+
+        return FindOptimizedPathResponse(
+            path=[n.name for n in path_nodes],
+            final_amount=eval_result["final_amount"],
+            total_fee=eval_result["total_fee"],
+            hops=hops,
+        )
+    
     except HTTPException:
         raise
     except Exception as e:
