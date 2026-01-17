@@ -15,7 +15,7 @@ from app.services.conversion_optimizer import dijkstra
 
 router = APIRouter(tags=["currency"])
 
-@router.get("/convert", response_model=ConvertCurrencyResponse)
+@router.post("/convert", response_model=ConvertCurrencyResponse)
 async def convert_currency_endpoint(request: ConvertCurrencyRequest):
     """
     Convert currency using exchange rates.
@@ -29,7 +29,7 @@ async def convert_currency_endpoint(request: ConvertCurrencyRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/cost", response_model=GetCostResponse)
+@router.post("/cost", response_model=GetCostResponse)
 async def get_cost_endpoint(request: GetCostRequest):
     """
     Get the cost (fee) for converting from one currency to another.
@@ -37,11 +37,11 @@ async def get_cost_endpoint(request: GetCostRequest):
     """
     try:
         if request.from_currency in FIAT_CURRENCIES or request.to_currency in FIAT_CURRENCIES:
-            cost, exchange = exchange_fiat.Get_cost(
+            cost, exchange = exchange_fiat.get_cost(
                 request.from_currency, request.to_currency, request.amount
             )
         else:
-            cost, exchange = exchange_crypto.Get_cost(
+            cost, exchange = exchange_crypto.get_cost(
                 request.from_currency, request.to_currency, request.amount
             )
 
@@ -50,7 +50,7 @@ async def get_cost_endpoint(request: GetCostRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/dijkstra", response_model=DijkstraResponse)
+@router.post("/dijkstra", response_model=DijkstraResponse)
 async def dijkstra_endpoint(request: DijkstraRequest):
     """
     Run Dijkstra's algorithm to find shortest path costs from a starting currency.

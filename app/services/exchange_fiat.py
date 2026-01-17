@@ -26,7 +26,7 @@ def _require_credentials():
         raise BitsoAPIError("BITSO_API_KEY and BITSO_API_SECRET must be set.")
     return BITSO_API_KEY, BITSO_API_SECRET
 
-def _sign_request(nonce, method, path, body):
+def _sign_request(nonce, method, path, body=""):
     """
     Bitso signature:
         message = nonce + METHOD + path + body
@@ -96,9 +96,12 @@ def init_bitso_data():
     fees_list = payload.get("fees")
 
     BOOK_FEES = {
-        item["book"]: float(item["fee_percent"]) for item in fees_list
+        item["book"]: {
+            "maker": float(item["maker_fee_decimal"]),
+            "taker": float(item["taker_fee_decimal"]),
+        }
+        for item in fees_list
     }
-
 
 def get_trade_fee_for_pair(from_currency: str, to_currency: str):
     """
@@ -111,6 +114,7 @@ def get_trade_fee_for_pair(from_currency: str, to_currency: str):
 
     from_sym = NODE_TO_SYMBOL.get(from_currency)
     to_sym = NODE_TO_SYMBOL.get(to_currency)
+
     if not from_sym or not to_sym:
         return float("inf")
 
@@ -124,7 +128,7 @@ def get_trade_fee_for_pair(from_currency: str, to_currency: str):
     else:
         return float("inf")
 
-    return BOOK_FEES[book]
+    return BOOK_FEES[book]["taker"]
 
 
 def get_cost(from_currency, to_currency, amount):
@@ -137,13 +141,10 @@ def get_cost(from_currency, to_currency, amount):
         cost=float('inf') if no book exists
     """
 
-    if from_currency == to_currency:
-        return 0.0, "bitso"
+    fee_fraction = get_trade_fee_for_pair(from_currency, to_currency)
 
-    fee_percent = get_trade_fee_for_pair(from_currency, to_currency)
-
-    if fee_percent == float("inf"):
+    if fee_fraction == float("inf"):
         return float("inf"), "bitso"
 
-    cost = amount * (fee_percent / 100.0)
+    cost = amount * fee_fraction
     return cost, "bitso"

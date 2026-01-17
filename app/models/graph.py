@@ -40,22 +40,26 @@ def get_fee_percent(from_currency: str, to_currency: str) -> tuple[float, str]:
     amount = 1.0
     # Case 1: at least one side is fiat then use Bitso
     if from_currency in FIAT_CURRENCIES or to_currency in FIAT_CURRENCIES:
-        cost, exchange = exchange_fiat.Get_cost(from_currency, to_currency, amount)
+        cost, exchange = exchange_fiat.get_cost(from_currency, to_currency, amount)
 
         # No direct market or invalid pair
         if cost == float("inf"):
             return float("inf"), exchange
 
         # Bitso cost ~ amount * (percent/100), so cost/amount = fee_fraction
-        p = cost / amount
-        return p, exchange
+        fee_percent = cost / amount
 
-    # Case 2: crypto ↔ crypto → use Swapzone
-    abs_fee_usd, fee_fraction, exchange = exchange_crypto.Get_cost(
-        from_currency, to_currency, amount
-    )
+    else:
+        cost, exchange = exchange_crypto.get_cost(from_currency, to_currency, amount)
 
-    return fee_fraction, exchange
+        # No direct market or invalid pair
+        if cost == float("inf"):
+            return float("inf"), exchange
+
+        fee_percent = cost / amount
+        
+    return fee_percent, exchange
+
 
 def get_neighbors(currency: str):
     """
