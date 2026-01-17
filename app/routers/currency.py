@@ -15,8 +15,7 @@ from app.services.conversion_optimizer import dijkstra
 
 router = APIRouter(tags=["currency"])
 
-
-@router.post("/convert", response_model=ConvertCurrencyResponse)
+@router.get("/convert", response_model=ConvertCurrencyResponse)
 async def convert_currency_endpoint(request: ConvertCurrencyRequest):
     """
     Convert currency using exchange rates.
@@ -30,8 +29,7 @@ async def convert_currency_endpoint(request: ConvertCurrencyRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-
-@router.post("/cost", response_model=GetCostResponse)
+@router.get("/cost", response_model=GetCostResponse)
 async def get_cost_endpoint(request: GetCostRequest):
     """
     Get the cost (fee) for converting from one currency to another.
@@ -52,7 +50,7 @@ async def get_cost_endpoint(request: GetCostRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/dijkstra", response_model=DijkstraResponse)
+@router.get("/dijkstra", response_model=DijkstraResponse)
 async def dijkstra_endpoint(request: DijkstraRequest):
     """
     Run Dijkstra's algorithm to find shortest path costs from a starting currency.

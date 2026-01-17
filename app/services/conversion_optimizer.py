@@ -2,7 +2,6 @@ import heapq
 
 from app.models.graph import Graph
 
-
 def dijkstra(graph: Graph, start):
     costs = {node: float("inf") for node in graph.nodes}
     prev = {node: None for node in costs}

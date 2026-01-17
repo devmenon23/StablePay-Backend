@@ -14,69 +14,95 @@ SYMBOL_TO_NODE = {
     "mxn": "MXN",
 }
 
-NODE_TO_SYMBOL = {v: k for k, v in SYMBOL_TO_NODE.items()}
+NODE_TO_SYMBOL = {node: sym for sym, node in SYMBOL_TO_NODE.items()}
 
 BOOK_FEES = {}
 
+class BitsoAPIError(RuntimeError):
+    """Raised when Bitso returns an error payload or an unexpected schema."""
 
-def _bitso_request(method: str, path: str, auth: bool = False, params=None):
+def _require_credentials():
+    if not BITSO_API_KEY or not BITSO_API_SECRET:
+        raise BitsoAPIError("BITSO_API_KEY and BITSO_API_SECRET must be set.")
+    return BITSO_API_KEY, BITSO_API_SECRET
+
+def _sign_request(nonce, method, path, body):
     """
-    Minimal Bitso request wrapper.
-    For GET + no body, the signed message is: nonce + method + path + ""
-    Query params are NOT included in the signature.
+    Bitso signature:
+        message = nonce + METHOD + path + body
+
+    For GET with no body, body="".
     """
-    url = BITSO_BASE_URL + path
+    _, secret = _require_credentials()
+    message = f"{nonce}{method.upper()}{path}{body}"
+    return hmac.new(
+        secret.encode("utf-8"),
+        message.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+def _bitso_request(method, path, auth, params=None, timeout_s=10.0):
+    """
+    Bitso request wrapper.
+
+    - Signs nonce+METHOD+path(+body) when auth=True
+    - Returns `data["payload"]`
+    """
+    if not path.startswith("/"):
+        path = "/" + path
+
+    base_url = BITSO_BASE_URL.rstrip("/")
+    url = f"{base_url}{path}"
+
     headers = {"Content-Type": "application/json"}
 
     if auth:
-        if not BITSO_API_KEY or not BITSO_API_SECRET:
-            raise RuntimeError("BITSO_API_KEY and BITSO_API_SECRET must be set in environment.")
-
+        api_key, _ = _require_credentials()
         nonce = str(int(time.time() * 1000))
-        message = nonce + method.upper() + path
+        signature = _sign_request(nonce, method, path)
+        headers["Authorization"] = f"Bitso {api_key}:{nonce}:{signature}"
 
-        signature = hmac.new(
-            BITSO_API_SECRET.encode("utf-8"),
-            message.encode("utf-8"),
-            hashlib.sha256,
-        ).hexdigest()
-
-        headers["Authorization"] = f"Bitso {BITSO_API_KEY}:{nonce}:{signature}"
-
-    resp = requests.request(method, url, params=params, headers=headers, timeout=10)
+    resp = requests.request(
+        method=method.upper(),
+        url=url,
+        params=params,
+        headers=headers,
+        timeout=timeout_s,
+    ) 
     resp.raise_for_status()
 
     data = resp.json()
+    if not isinstance(data, dict):
+        raise BitsoAPIError(f"Unexpected response type: {type(data)}")
 
-    if not data.get("success", True):
-        raise RuntimeError(f"Bitso API error: {data}")
+    if data.get("success", True) is not True:
+        raise BitsoAPIError(f"Bitso API error: {data}")
+
+    if "payload" not in data:
+        raise BitsoAPIError(f"Missing payload in response: {data}")
 
     return data["payload"]
 
 
 def init_bitso_data():
     """
-    Populate BOOK_FEES from Bitso.
-    Call this once at startup.
-    """
+    Populate BOOK_FEES from Bitso fees endpoint.
 
+    Call this once at startup (or whenever you want to refresh fees).
+    """ 
     global BOOK_FEES
 
-    fees_payload = _bitso_request("GET", "/api/v3/fees/", auth=True)
-    fees_list = fees_payload["fees"]
+    payload = _bitso_request("GET", "/api/v3/fees/", auth=True)
+    fees_list = payload.get("fees")
 
     BOOK_FEES = {
-        fee["book"]: {
-            "maker": float(fee["maker_fee_percent"]),
-            "taker": float(fee["taker_fee_percent"]),
-        }
-        for fee in fees_list
+        item["book"]: float(item["fee_percent"]) for item in fees_list
     }
 
 
 def get_trade_fee_for_pair(from_currency: str, to_currency: str):
     """
-    Given two node names (e.g. "ARS", "USDC"), return taker_fee_percent as a float.
+    Given two node names (e.g. "ARS", "USDC"), return fee percent as a float.
 
     Example: if Bitso says "0.6500" (0.65%), we store 0.65 and return 0.65.
 
@@ -85,12 +111,11 @@ def get_trade_fee_for_pair(from_currency: str, to_currency: str):
 
     from_sym = NODE_TO_SYMBOL.get(from_currency)
     to_sym = NODE_TO_SYMBOL.get(to_currency)
-
     if not from_sym or not to_sym:
         return float("inf")
 
-    book1 = f"{from_sym}_{to_sym}"
-    book2 = f"{to_sym}_{from_sym}"
+    book1 = f"{from_sym}_{to_sym}".lower()
+    book2 = f"{to_sym}_{from_sym}".lower()
 
     if book1 in BOOK_FEES:
         book = book1
@@ -99,19 +124,17 @@ def get_trade_fee_for_pair(from_currency: str, to_currency: str):
     else:
         return float("inf")
 
-    fee_percent = BOOK_FEES[book]["taker"]
-    return fee_percent
+    return BOOK_FEES[book]
 
 
-def Get_cost(from_currency, to_currency, amount):
+def get_cost(from_currency, to_currency, amount):
     """
     Return the absolute fee for trading `amount` of from_currency into to_currency,
-    using Bitso's taker fee percentage.
+    using Bitso's fee percent.
 
-    Example:
-      BOOK_FEES["usd_ars"]["taker"] == 0.65
-      amount = 1000 ARS
-      cost = 1000 * (0.65 / 100) = 6.5 ARS
+    Returns:
+        (cost, "bitso")
+        cost=float('inf') if no book exists
     """
 
     if from_currency == to_currency:
@@ -122,7 +145,5 @@ def Get_cost(from_currency, to_currency, amount):
     if fee_percent == float("inf"):
         return float("inf"), "bitso"
 
-    fee_fraction = fee_percent / 100.0
-    cost = amount * fee_fraction
-
+    cost = amount * (fee_percent / 100.0)
     return cost, "bitso"

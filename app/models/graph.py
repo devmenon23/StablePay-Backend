@@ -2,7 +2,6 @@ import math
 
 from app.core.config import FIAT_CURRENCIES
 
-
 class Edge:
     def __init__(self, to_node, cost, exchange):
         self.to_node = to_node
@@ -33,15 +32,13 @@ def get_fee_percent(from_currency: str, to_currency: str) -> tuple[float, str]:
     """
     Compute fee percentage p for the edge (from_currency -> to_currency).
     For FIAT edges, Bitso returns an absolute fee which we turn into a fraction.
-    For crypto ↔ crypto edges, Swapzone gives us the fee fraction directly.
-    Returns (p, exchange_name) where p is in [0, 1) if valid.
+    For crypto to crypto edges, Swapzone gives us the fee fraction directly.
     """
     # Import here to avoid circular imports
     from app.services import exchange_crypto, exchange_fiat
 
     amount = 1.0
-
-    # Case 1: at least one side is fiat → use Bitso
+    # Case 1: at least one side is fiat then use Bitso
     if from_currency in FIAT_CURRENCIES or to_currency in FIAT_CURRENCIES:
         cost, exchange = exchange_fiat.Get_cost(from_currency, to_currency, amount)
 
@@ -60,11 +57,9 @@ def get_fee_percent(from_currency: str, to_currency: str) -> tuple[float, str]:
 
     return fee_fraction, exchange
 
-
 def get_neighbors(currency: str):
     """
-    Hard-coded neighbor map for now.
-    Replace with MoonPay/Bitso topology later.
+    Hardcoded neighbor map for minimum viable product.
     """
     neighbors = {
         "USDC": ["MXN", "ARS", "SOL", "BTC"],
@@ -74,7 +69,6 @@ def get_neighbors(currency: str):
         "BTC": ["USDC", "SOL", "ARS", "MXN"],
     }
     return neighbors.get(currency, [])
-
 
 class Graph:
     def __init__(self):

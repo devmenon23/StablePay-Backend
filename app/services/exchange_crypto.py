@@ -2,7 +2,6 @@ import requests
 
 from app.services import convert
 
-
 def Get_cost(src, dest, amount):
     url = "https://api.swapzone.io/v1/exchange/get-rate"
 

@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "stableliving"
+name = "stablepay"
 version = "1.0.0"
 description = "Currency conversion and optimization API"
 authors = ["Your Name <you@example.com>"]
