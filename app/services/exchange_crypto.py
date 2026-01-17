@@ -27,4 +27,4 @@ def get_cost(src, dest, amount):
     before_usd = convert.convert_currency(src, "USD", resp["amountFrom"])
     after_usd = convert.convert_currency(dest, "USD", resp["amountTo"])
 
-    return before_usd - after_usd, "swapzone"
+    return before_usd - after_usd, (before_usd - after_usd) / before_usd, "swapzone"

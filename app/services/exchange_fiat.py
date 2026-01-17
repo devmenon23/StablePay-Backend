@@ -113,7 +113,7 @@ def get_trade_fee_for_pair(from_currency: str, to_currency: str):
     to_sym = NODE_TO_SYMBOL.get(to_currency)
 
     if not from_sym or not to_sym:
-        return float("inf")
+        return float("inf"), "bitso"
 
     book1 = f"{from_sym}_{to_sym}".lower()
     book2 = f"{to_sym}_{from_sym}".lower()
@@ -125,7 +125,7 @@ def get_trade_fee_for_pair(from_currency: str, to_currency: str):
     else:
         return float("inf")
 
-    return BOOK_FEES[book]
+    return BOOK_FEES[book], "bitso"
 
 
 def get_cost(from_currency, to_currency, amount):

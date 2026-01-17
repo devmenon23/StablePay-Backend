@@ -59,7 +59,7 @@ async def find_optimized_path_endpoint(request: FindOptimizedPathRequest):
     """
     try:
         g = Graph()
-        g.update_costs()
+        g.update_fees()
 
         start_node = None
         for node in g.nodes:
@@ -109,7 +109,7 @@ async def find_optimized_path_endpoint(request: FindOptimizedPathRequest):
             total_fee=eval_result["total_fee"],
             hops=hops,
         )
-    
+
     except HTTPException:
         raise
     except Exception as e:

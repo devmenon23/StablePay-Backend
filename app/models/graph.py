@@ -45,7 +45,8 @@ def get_fee_percent(from_currency: str, to_currency: str) -> tuple[float, str]:
         if fee_percent == float("inf"):
             return float("inf"), exchange
     else:
-        fee_percent, exchange = exchange_crypto.get_trade_fee_for_pair(from_currency, to_currency)
+        cost, exchange = exchange_crypto.get_cost(from_currency, to_currency, 1)
+        fee_percent = cost  # cost is already a fraction
 
         # No direct market or invalid pair
         if fee_percent == float("inf"):
