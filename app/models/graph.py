@@ -27,7 +27,6 @@ class Node:
             ", ".join([str(edge) for edge in self.edges]),
         )
 
-
 def get_fee_percent(from_currency: str, to_currency: str) -> tuple[float, str]:
     """
     Compute fee percentage p for the edge (from_currency -> to_currency).
@@ -52,7 +51,6 @@ def get_fee_percent(from_currency: str, to_currency: str) -> tuple[float, str]:
             return float("inf"), exchange
         
     return fee_percent, exchange
-
 
 def get_neighbors(currency: str):
     """

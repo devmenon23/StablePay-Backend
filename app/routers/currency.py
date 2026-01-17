@@ -42,7 +42,7 @@ async def get_cost_endpoint(request: GetCostRequest):
                 request.from_currency, request.to_currency, request.amount
             )
         else:
-            cost, exchange = exchange_crypto.get_cost(
+            cost, fee_percent, exchange = exchange_crypto.get_cost(
                 request.from_currency, request.to_currency, request.amount
             )
 
