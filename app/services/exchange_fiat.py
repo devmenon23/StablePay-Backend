@@ -123,7 +123,7 @@ def get_trade_fee_for_pair(from_currency: str, to_currency: str):
     elif book2 in BOOK_FEES:
         book = book2
     else:
-        return float("inf")
+        return float("inf"), "bitso"
 
     return BOOK_FEES[book], "bitso"
 
@@ -138,7 +138,7 @@ def get_cost(from_currency, to_currency, amount):
         cost=float('inf') if no book exists
     """
 
-    fee_fraction = get_trade_fee_for_pair(from_currency, to_currency)
+    fee_fraction, exchange = get_trade_fee_for_pair(from_currency, to_currency)
 
     if fee_fraction == float("inf"):
         return float("inf"), "bitso"
