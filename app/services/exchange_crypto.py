@@ -1,6 +1,7 @@
 import requests
 
 from app.services import convert
+from app.core.config import SWAPZONE_API_SECRET
 
 def get_cost(src, dest, amount):
     url = "https://api.swapzone.io/v1/exchange/get-rate"
@@ -16,7 +17,7 @@ def get_cost(src, dest, amount):
         "ofcAdapter": "true",
     }
 
-    headers = {"x-api-key": "w7vDUCFZQ"}
+    headers = {"x-api-key": SWAPZONE_API_SECRET}
 
     response = requests.get(url, params=params, headers=headers)
     if response.status_code != 200:
